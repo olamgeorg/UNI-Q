@@ -48,7 +48,7 @@ export default function QuizRenderer({ subject, year, onRestart }) {
     setCurrentIndex(0);
     setIsSubmitted(false);
     setIsFinished(false);
-    setTimeLeft(3600);
+    setTimeLeft(2100);
 
     fetchQuestions(subject, year)
 .then((data) => {
