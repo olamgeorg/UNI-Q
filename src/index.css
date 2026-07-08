@@ -10,6 +10,7 @@
   body {
     @apply bg-gray-50 text-gray-900 antialiased min-h-screen;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
@@ -47,5 +48,16 @@
 
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-5;
+  }
+
+  .quiz-complete-container {
+    padding-bottom: 120px;
+  }
+
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    z-index: 1000;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
