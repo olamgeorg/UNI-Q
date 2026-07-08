@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchQuestions } from '../data/questions';
-
+import { supabase } from '../lib/supabase';
 export default function QuizRenderer({ subject, year, onRestart }) {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -164,18 +164,39 @@ export default function QuizRenderer({ subject, year, onRestart }) {
     );
   }
 
-  if (isFinished) {
-    const score = calculateScore();
-    return (
-      <div className="p-4 text-center">
-        <h2 className="text-2xl font-bold mb-2 text-gray-900">Quiz Complete!</h2>
-        <p className="text-lg mb-2 text-gray-700">Mode: {mode === 'exam'? 'Exam' : 'Practice'}</p>
-        <p className="text-2xl font-bold text-blue-600 mb-6">Your score: {score} / {questions.length}</p>
-        <button onClick={onRestart} className="px-6 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors">Exit</button>
-      </div>
-    );
-  }
 
+if (isFinished) {
+  const score = calculateScore();
+
+  useEffect(() => {
+    const saveScore = async () => {
+      const { error } = await supabase.from('quiz_results').insert([{
+        user_id: 'guest',
+        subject: subject,
+        year: year,
+        score: score,
+        total: questions.length
+      }])
+      if (error) console.error('Error saving score:', error)
+    }
+    saveScore()
+  }, [])
+
+  return (
+    <div className="p-4 text-center">
+      <h2 className="text-2xl font-bold mb-4">Quiz Complete!</h2>
+      <p className="text-lg mb-2 text-gray-700">Mode: {mode === 'exam' ? 'Exam' : 'Practice'}</p>
+      <p className="text-2xl font-bold text-blue-600 mb-6">Your score: {score} / {questions.length}</p>
+      <button onClick={onRestart} className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold">
+        Restart
+      </button>
+    </div>
+  );
+}
+
+
+
+  
   const currentQ = questions[currentIndex];
   const labels = ['A', 'B', 'C', 'D'];
   const currentAnswer = userAnswers[currentIndex];
