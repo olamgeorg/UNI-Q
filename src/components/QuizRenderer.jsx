@@ -165,22 +165,25 @@ export default function QuizRenderer({ subject, year, onRestart }) {
   }
 
 
-if (isFinished) {
-  const score = calculateScore();
-
-  useEffect(() => {
+useEffect(() => {
+  if (isFinished) {
+    const score = calculateScore();
     const saveScore = async () => {
-      const { error } = await supabase.from('quiz_results').insert([{
-        user_id: 'guest',
-        subject: subject,
-        year: year,
-        score: score,
-        total: questions.length
-      }])
-      if (error) console.error('Error saving score:', error)
-    }
-    saveScore()
-  }, [])
+      const { error } = await supabase
+        .from('quiz_results')
+        .insert([{
+          user_id: 'guest',
+          subject: subject,
+          year: year,
+          score: score,
+          total: questions.length
+        }]);
+      if (error) console.error('Error saving score:', error);
+    };
+    saveScore();
+  }
+}, [isFinished, subject, year, questions.length]);
+
 
   return (
     <div className="p-4 text-center">
