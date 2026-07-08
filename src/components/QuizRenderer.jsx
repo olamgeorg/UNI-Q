@@ -185,13 +185,20 @@ useEffect(() => {
 }, [isFinished, subject, year, questions.length]);
 
 
+  // Loading and Error checks
+if (loading) return <div className="p-4 text-center">Loading questions...</div>;
+if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
+
+// Finished screen
+if (isFinished) {
   return (
-    <div className="p-4 text-center">
+    <div className="quiz-complete-container p-6 text-center">
       <h2 className="text-2xl font-bold mb-4">Quiz Complete!</h2>
-      <p className="text-lg mb-2 text-gray-700">Mode: {mode === 'exam' ? 'Exam' : 'Practice'}</p>
-      <p className="text-2xl font-bold text-blue-600 mb-6">Your score: {score} / {questions.length}</p>
-      <button onClick={onRestart} className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold">
-        Restart
+      <p className="text-xl font-semibold mb-6">
+        Your Score: {calculateScore()} / {questions.length}
+      </p>
+      <button onClick={onRestart} className="btn-primary max-w-xs mx-auto">
+        Restart Quiz
       </button>
     </div>
   );
