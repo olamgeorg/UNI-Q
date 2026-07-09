@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchQuestions } from '../data/questions';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 
 export default function QuizRenderer({ subject, year, onRestart }) {
   const [questions, setQuestions] = useState([]);
