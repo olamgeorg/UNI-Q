@@ -335,3 +335,4 @@ if (isFinished) {
     </div>
   );
 }
+export default QuizRenderer
