@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchQuestions } from '../data/questions';
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase';
+
 export default function QuizRenderer({ subject, year, onRestart }) {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,31 +11,42 @@ export default function QuizRenderer({ subject, year, onRestart }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [mode, setMode] = useState('practice');
   const [isMuted, setIsMuted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(3600);
+  const [timeLeft, setTimeLeft] = useState(2100); // 35 minutes
   const [isFinished, setIsFinished] = useState(false);
 
   const audioCtx = useRef(null);
   const timerRef = useRef(null);
 
-  // Create audio context on first user interaction
   const initAudio = () => {
     if (!audioCtx.current) {
-      audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        audioCtx.current = new AudioContext();
+      }
+    }
+    if (audioCtx.current && audioCtx.current.state === 'suspended') {
+      audioCtx.current.resume();
     }
   };
 
   const playTone = (freq, duration) => {
     if (isMuted) return;
     initAudio();
+    if (!audioCtx.current) return;
+    
     const ctx = audioCtx.current;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
+    
     osc.connect(gain);
     gain.connect(ctx.destination);
+    
     osc.frequency.value = freq;
     osc.type = 'sine';
+    
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+    
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + duration);
   };
@@ -51,7 +63,7 @@ export default function QuizRenderer({ subject, year, onRestart }) {
     setTimeLeft(2100);
 
     fetchQuestions(subject, year)
-.then((data) => {
+      .then((data) => {
         if (isMounted) {
           if (data.length === 0) {
             setError('No questions found.');
@@ -62,7 +74,7 @@ export default function QuizRenderer({ subject, year, onRestart }) {
           setLoading(false);
         }
       })
-.catch(() => {
+      .catch(() => {
         if (isMounted) {
           setError('Failed to load questions.');
           setLoading(false);
@@ -76,7 +88,7 @@ export default function QuizRenderer({ subject, year, onRestart }) {
   }, [subject, year]);
 
   useEffect(() => {
-    if (mode === 'exam' &&!isSubmitted && questions.length > 0) {
+    if (mode === 'exam' && !isSubmitted && questions.length > 0) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -91,8 +103,27 @@ export default function QuizRenderer({ subject, year, onRestart }) {
     return () => clearInterval(timerRef.current);
   }, [mode, isSubmitted, questions.length]);
 
+  useEffect(() => {
+    if (isFinished) {
+      const score = calculateScore();
+      const saveScore = async () => {
+        const { error } = await supabase
+          .from('quiz_results')
+          .insert([{
+            user_id: 'guest',
+            subject: subject,
+            year: year,
+            score: score,
+            total: questions.length
+          }]);
+        if (error) console.error('Error saving score:', error);
+      };
+      saveScore();
+    }
+  }, [isFinished, subject, year, questions.length]);
+
   const handleSelect = (index) => {
-    if (mode === 'practice' && userAnswers[currentIndex]!== null) return;
+    if (mode === 'practice' && userAnswers[currentIndex] !== null) return;
     if (mode === 'exam' && isSubmitted) return;
 
     const labels = ['A', 'B', 'C', 'D'];
@@ -103,10 +134,8 @@ export default function QuizRenderer({ subject, year, onRestart }) {
     newAnswers[currentIndex] = index;
     setUserAnswers(newAnswers);
 
-    // Practice mode: high tone = correct, low tone = wrong
-    // Exam mode: neutral click tone
     if (mode === 'practice') {
-      playTone(isCorrect? 800 : 300, 0.15);
+      playTone(isCorrect ? 800 : 300, 0.15);
     } else {
       playTone(600, 0.1);
     }
@@ -147,7 +176,7 @@ export default function QuizRenderer({ subject, year, onRestart }) {
   const calculateScore = () => {
     const labels = ['A', 'B', 'C', 'D'];
     return questions.reduce((acc, q, idx) => {
-      return acc + (userAnswers[idx]!== null && labels[userAnswers[idx]] === q.answer? 1 : 0);
+      return acc + (userAnswers[idx] !== null && labels[userAnswers[idx]] === q.answer ? 1 : 0);
     }, 0);
   };
 
@@ -164,53 +193,24 @@ export default function QuizRenderer({ subject, year, onRestart }) {
     );
   }
 
-
-useEffect(() => {
   if (isFinished) {
-    const score = calculateScore();
-    const saveScore = async () => {
-      const { error } = await supabase
-        .from('quiz_results')
-        .insert([{
-          user_id: 'guest',
-          subject: subject,
-          year: year,
-          score: score,
-          total: questions.length
-        }]);
-      if (error) console.error('Error saving score:', error);
-    };
-    saveScore();
+    return (
+      <div className="quiz-complete-container p-6 text-center">
+        <h2 className="text-2xl font-bold mb-4">Quiz Complete!</h2>
+        <p className="text-xl font-semibold mb-6">
+          Your Score: {calculateScore()} / {questions.length}
+        </p>
+        <button onClick={onRestart} className="btn-primary max-w-xs mx-auto">
+          Restart Quiz
+        </button>
+      </div>
+    );
   }
-}, [isFinished, subject, year, questions.length]);
 
-
-  // Loading and Error checks
-if (loading) return <div className="p-4 text-center">Loading questions...</div>;
-if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
-
-// Finished screen
-if (isFinished) {
-  return (
-    <div className="quiz-complete-container p-6 text-center">
-      <h2 className="text-2xl font-bold mb-4">Quiz Complete!</h2>
-      <p className="text-xl font-semibold mb-6">
-        Your Score: {calculateScore()} / {questions.length}
-      </p>
-      <button onClick={onRestart} className="btn-primary max-w-xs mx-auto">
-        Restart Quiz
-      </button>
-    </div>
-  );
-}
-
-
-
-  
   const currentQ = questions[currentIndex];
   const labels = ['A', 'B', 'C', 'D'];
   const currentAnswer = userAnswers[currentIndex];
-  const isAnswered = currentAnswer!== null;
+  const isAnswered = currentAnswer !== null;
 
   if (!currentQ) {
     return <div className="p-4 text-center text-red-600">Question data error</div>;
@@ -224,7 +224,7 @@ if (isFinished) {
             onClick={() => {initAudio(); setMode('practice')}}
             disabled={isAnswered}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              mode === 'practice'? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+              mode === 'practice' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
             }`}
           >
             Practice
@@ -233,7 +233,7 @@ if (isFinished) {
             onClick={() => {initAudio(); setMode('exam')}}
             disabled={isAnswered}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              mode === 'exam'? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+              mode === 'exam' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
             }`}
           >
             Exam
@@ -242,16 +242,16 @@ if (isFinished) {
 
         <div className="flex items-center gap-3">
           {mode === 'exam' && (
-            <span className={`text-sm font-mono font-bold ${timeLeft < 300? 'text-red-600' : 'text-gray-700'}`}>
-              ⏱ {formatTime(timeLeft)}
+            <span className={`text-sm font-mono font-bold ${timeLeft < 300 ? 'text-red-600' : 'text-gray-700'}`}>
+              ⏱️ {formatTime(timeLeft)}
             </span>
           )}
           <button
             onClick={() => {initAudio(); setIsMuted(!isMuted)}}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors text-xl"
-            title={isMuted? 'Unmute' : 'Mute'}
+            title={isMuted ? 'Unmute' : 'Mute'}
           >
-            {isMuted? '🔇' : '🔊'}
+            {isMuted ? '🔇' : '🔊'}
           </button>
         </div>
       </div>
@@ -328,11 +328,10 @@ if (isFinished) {
           className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
           {mode === 'exam' && currentIndex === questions.length - 1
-      ? 'Submit Quiz'
+            ? 'Submit Quiz'
             : 'Next Question'}
         </button>
       </div>
     </div>
   );
 }
-
